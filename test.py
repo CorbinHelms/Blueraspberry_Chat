@@ -1,114 +1,84 @@
-import os
-import sys
-import bluetooth
-import threading
 import tkinter as tk
-from tkinter import messagebox
-
-
-class Chat:
-    def __init__(self, is_server):
-        self.server_sock = None
-        self.client_sock = None
-        self.is_server = is_server
-        self.running = False
-
-        # If running as a server, wait for client to connect
-        if self.is_server:
-            self.server_sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
-            self.server_sock.bind(("", bluetooth.PORT_ANY))
-            self.server_sock.listen(1)
-            self.port = self.server_sock.getsockname()[1]
-
-            messagebox.showinfo("Server", "Waiting for client to connect...")
-
-            self.client_sock, self.client_info = self.server_sock.accept()
-            messagebox.showinfo("Server", "Client connected!")
-        else:
-            # If running as a client, connect to server
-            server_address = input("Enter server MAC address: ")
-            self.client_sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
-
-            try:
-                self.client_sock.connect((server_address, bluetooth.PORT_ANY))
-                messagebox.showinfo("Client", "Connected to server!")
-            except bluetooth.btcommon.BluetoothError as err:
-                messagebox.showerror("Client", f"Error: {err}")
-                sys.exit()
-
-        # Start the thread to receive messages
-        threading.Thread(target=self.receive_messages).start()
-
-    def send_message(self, message):
-        if self.running:
-            self.client_sock.send(message.encode())
-            print("Message sent")
-        else:
-            print("Error: client not connected")
-
-    def receive_messages(self):
-        self.running = True
-
-        while self.running:
-            try:
-                message = self.client_sock.recv(1024).decode()
-                print(f"Received message: {message}")
-                self.gui.add_message(message)
-            except bluetooth.btcommon.BluetoothError as err:
-                print(f"Error: {err}")
-                self.running = False
-
-        self.client_sock.close()
-        self.server_sock.close()
-
-    def disconnect(self):
-        self.running = False
-
+from tkinter import scrolledtext
+import bluetooth
 
 class ChatGUI:
-    def __init__(self):
-        self.root = tk.Tk()
-        self.root.title("Bluetooth Chat")
-        
-        self.connection_frame = tk.Frame(self.root)
-        self.connection_frame.pack(pady=10)
-        
-        self.server_button = tk.Button(self.connection_frame, text="Start as Server", command=self.start_server)
-        self.server_button.pack(side=tk.LEFT, padx=5)
-        
-        self.client_button = tk.Button(self.connection_frame, text="Start as Client", command=self.start_client)
-        self.client_button.pack(side=tk.LEFT, padx=5)
-        
-        self.root.mainloop()
-    
-    def start_server(self):
-        chat = Chat(is_server=True)
-        self.display_chat(chat)
-        
-    def start_client(self):
-        chat = Chat(is_server=False)
-        self.display_chat(chat)
-        
-    def display_chat(self, chat):
-        self.root.withdraw()
-        self.gui = ChatGUIWindow(chat, self.root)
-        
-        
-class ChatGUIWindow:
-    def __init__(self, chat, master=None):
-        self.chat = chat
-        
-        self.chat_frame = tk.Frame(master)
-        self.chat_frame.pack(padx=10, pady=10)
-        
-        self.message_entry = tk.Entry(self.chat_frame)
-        self.message_entry.pack(side=tk.LEFT, padx=5, expand=True, fill=tk.X)
-        
-def main():
-    app = QApplication(sys.argv)
-    window = Window()
-    window.show()
-    sys.exit(app.exec_())
+    def __init__(self, master):
+        self.master = master
+        master.title("Bluetooth Chat")
+        master.configure(background='#1E90FF')
+        master.resizable(False, False)
 
-if __name__ == "__main__":
-    main()
+        self.frame = tk.Frame(master, background='#B0E0E6')
+        self.frame.pack(padx=10, pady=10)
+
+        self.chat_log = scrolledtext.ScrolledText(self.frame, width=40, height=10)
+        self.chat_log.configure(state='disabled')
+        self.chat_log.grid(row=0, column=0, padx=5, pady=5)
+
+        self.entry_field = tk.Entry(self.frame, width=30)
+        self.entry_field.grid(row=1, column=0, padx=5, pady=5)
+
+        self.send_button = tk.Button(self.frame, text="Send", command=self.send_message)
+        self.send_button.grid(row=1, column=1, padx=5, pady=5)
+
+        self.quit_button = tk.Button(self.frame, text="Quit", command=self.master.quit)
+        self.quit_button.grid(row=1, column=2, padx=5, pady=5)
+
+    def send_message(self):
+        message = self.entry_field.get()
+        if message:
+            self.entry_field.delete(0, tk.END)
+            self.chat_log.configure(state='normal')
+            self.chat_log.insert(tk.END, f"You: {message}\n")
+            self.chat_log.see(tk.END)
+            self.chat_log.configure(state='disabled')
+            send_message_to_server(message)
+
+    def display_message(self, message):
+        self.chat_log.configure(state='normal')
+        self.chat_log.insert(tk.END, f"Server: {message}\n")
+        self.chat_log.see(tk.END)
+        self.chat_log.configure(state='disabled')
+        
+server_address = None
+client_socket = None
+
+def connect_to_server():
+    global server_address, client_socket
+    nearby_devices = bluetooth.discover_devices()
+    for device in nearby_devices:
+        if 'Raspberry Pi' in bluetooth.lookup_name(device):
+            server_address = device
+            break
+
+    if server_address is None:
+        print("No nearby Raspberry Pi devices found.")
+        return False
+
+    port = 1
+    client_socket = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
+    client_socket.connect((server_address, port))
+    return True
+
+def close_connection():
+    if client_socket:
+        client_socket.close()
+
+def send_message_to_server(message):
+    if client_socket:
+        client_socket.send(message.encode())
+
+def receive_messages_from_server(chat_gui):
+    while True:
+        if client_socket:
+            message = client_socket.recv(1024)
+            if message:
+                chat_gui.display_message(message.decode())
+                
+if __name__ == '__main__':
+    root = tk.Tk()
+    chat_gui = ChatGUI(root)
+    connected = connect_to_server()
+    if connected:
+        receive_thread = threading.Thread(target=receive_messages_from_server, args=(chat_gui,))
