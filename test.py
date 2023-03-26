@@ -1,98 +1,114 @@
-import tkinter as tk
+import os
+import sys
+import bluetooth
 import threading
-import subprocess
+import tkinter as tk
+from tkinter import messagebox
+
+
+class Chat:
+    def __init__(self, is_server):
+        self.server_sock = None
+        self.client_sock = None
+        self.is_server = is_server
+        self.running = False
+
+        # If running as a server, wait for client to connect
+        if self.is_server:
+            self.server_sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
+            self.server_sock.bind(("", bluetooth.PORT_ANY))
+            self.server_sock.listen(1)
+            self.port = self.server_sock.getsockname()[1]
+
+            messagebox.showinfo("Server", "Waiting for client to connect...")
+
+            self.client_sock, self.client_info = self.server_sock.accept()
+            messagebox.showinfo("Server", "Client connected!")
+        else:
+            # If running as a client, connect to server
+            server_address = input("Enter server MAC address: ")
+            self.client_sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
+
+            try:
+                self.client_sock.connect((server_address, bluetooth.PORT_ANY))
+                messagebox.showinfo("Client", "Connected to server!")
+            except bluetooth.btcommon.BluetoothError as err:
+                messagebox.showerror("Client", f"Error: {err}")
+                sys.exit()
+
+        # Start the thread to receive messages
+        threading.Thread(target=self.receive_messages).start()
+
+    def send_message(self, message):
+        if self.running:
+            self.client_sock.send(message.encode())
+            print("Message sent")
+        else:
+            print("Error: client not connected")
+
+    def receive_messages(self):
+        self.running = True
+
+        while self.running:
+            try:
+                message = self.client_sock.recv(1024).decode()
+                print(f"Received message: {message}")
+                self.gui.add_message(message)
+            except bluetooth.btcommon.BluetoothError as err:
+                print(f"Error: {err}")
+                self.running = False
+
+        self.client_sock.close()
+        self.server_sock.close()
+
+    def disconnect(self):
+        self.running = False
 
 
 class ChatGUI:
     def __init__(self):
-        self.window = tk.Tk()
-        self.window.title("Chat Program")
-        self.window.geometry("400x200")
+        self.root = tk.Tk()
+        self.root.title("Bluetooth Chat")
         
-        # Create start buttons
-        self.server_button = tk.Button(self.window, text="Start as Server", command=self.start_server)
-        self.client_button = tk.Button(self.window, text="Start as Client", command=self.start_client)
-        self.server_button.pack(side=tk.LEFT, padx=10, pady=10)
-        self.client_button.pack(side=tk.LEFT, padx=10, pady=10)
+        self.connection_frame = tk.Frame(self.root)
+        self.connection_frame.pack(pady=10)
         
-        self.window.mainloop()
-
+        self.server_button = tk.Button(self.connection_frame, text="Start as Server", command=self.start_server)
+        self.server_button.pack(side=tk.LEFT, padx=5)
+        
+        self.client_button = tk.Button(self.connection_frame, text="Start as Client", command=self.start_client)
+        self.client_button.pack(side=tk.LEFT, padx=5)
+        
+        self.root.mainloop()
+    
     def start_server(self):
-        # Create server window
-        self.server_window = tk.Toplevel(self.window)
-        self.server_window.title("Server Window")
-        self.server_window.geometry("400x200")
-        
-        # Create waiting label
-        self.waiting_label = tk.Label(self.server_window, text="Waiting for client...")
-        self.waiting_label.pack(padx=10, pady=10)
-        
-        # Start server in a separate thread
-        threading.Thread(target=subprocess.run, args=(["python", "chat.py", "-s"],)).start()
-        
-        # Disable server button to prevent starting multiple servers
-        self.server_button.config(state=tk.DISABLED)
+        chat = Chat(is_server=True)
+        self.display_chat(chat)
         
     def start_client(self):
-        # Create client window
-        self.client_window = tk.Toplevel(self.window)
-        self.client_window.title("Client Window")
-        self.client_window.geometry("400x200")
+        chat = Chat(is_server=False)
+        self.display_chat(chat)
         
-        # Create MAC address entry and connect button
-        self.mac_label = tk.Label(self.client_window, text="Enter Server MAC Address:")
-        self.mac_label.pack(padx=10, pady=10)
-        self.mac_entry = tk.Entry(self.client_window)
-        self.mac_entry.pack(padx=10, pady=10)
-        self.connect_button = tk.Button(self.client_window, text="Connect", command=self.connect_to_server)
-        self.connect_button.pack(padx=10, pady=10)
+    def display_chat(self, chat):
+        self.root.withdraw()
+        self.gui = ChatGUIWindow(chat, self.root)
         
-        # Disable client button to prevent starting multiple clients
-        self.client_button.config(state=tk.DISABLED)
+        
+class ChatGUIWindow:
+    def __init__(self, chat, master=None):
+        self.chat = chat
+        
+        self.chat_frame = tk.Frame(master)
+        self.chat_frame.pack(padx=10, pady=10)
+        
+        self.message_entry = tk.Entry(self.chat_frame)
+        self.message_entry.pack(side=tk.LEFT, padx=5, expand=True, fill=tk.X)
+        
+def main():
+    app = QApplication(sys.argv)
+    window = Window()
+    window.show()
+    sys.exit(app.exec_())
 
-    def connect_to_server(self):
-        # Get MAC address from entry box
-        mac_address = self.mac_entry.get()
-        
-        # Start client in a separate thread
-        threading.Thread(target=subprocess.run, args=(["python", "chat.py", "-c", mac_address],)).start()
-        
-        # Destroy client window
-        self.client_window.destroy()
-        
-        # Create chat window
-        self.chat_window = tk.Toplevel(self.window)
-        self.chat_window.title("Chat Window")
-        self.chat_window.geometry("400x200")
-        
-        # Create chat box, message entry and send button
-        self.chat_box = tk.Text(self.chat_window)
-        self.chat_box.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        self.message_entry = tk.Entry(self.chat_window)
-        self.message_entry.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10, pady=10)
-        self.send_button = tk.Button(self.chat_window, text="Send", command=self.send_message)
-        self.send_button.pack(side=tk.LEFT, padx=10, pady=10)
-        
-        # Create disconnect button
-        self.disconnect_button = tk.Button(self.chat_window, text="Disconnect", command=self.disconnect)
-        self.disconnect_button.pack(side=tk.LEFT, padx=10, pady=10)
-        
-        # Disable message entry, send button, and disconnect button until connected
-        self.message_entry.config(state=tk.DISABLED)
-        self.send_button.config(state=tk.DISABLED)
-        self.disconnect_button.config(state=tk.DISABLED)
-        self.send_button = Button(self.chat_frame, text="Send", command=self.send_message)
-        self.send_button.pack(side=RIGHT, padx=5)
-        
-        self.disconnect_button = Button(self.chat_frame, text="Disconnect", command=self.disconnect)
-        self.disconnect_button.pack(side=RIGHT, padx=5)
-        
-        self.message_box = Text(self.chat_frame, state=DISABLED)
-        self.message_box.pack(side=BOTTOM, fill=BOTH, expand=True)
-        
-        # Start the GUI
-        self.root.mainloop()
-        
-if __name__ == '__main__':
-    ChatGUI()
-
+if __name__ == "__main__":
+    main()
