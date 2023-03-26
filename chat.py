@@ -1,6 +1,6 @@
 import bluetooth
 import sys
-import select
+import threading
 
 class BluetoothChat:
     def __init__(self):
@@ -31,30 +31,29 @@ class BluetoothChat:
 
     def receive_message(self):
         while True:
-            try:
-                ready = select.select([self.client_sock], [], [], 0.5)
-                if ready[0]:
-                    data = self.client_sock.recv(1024)
-                    if not data:
-                        break
-                    print("Received message:", data.decode("utf-8"))
-                    sys.stdout.flush()  # force printing to console
-            except:
+            data = self.client_sock.recv(1024)
+            if not data:
                 break
+            print("Received message:", data.decode("utf-8"))
+
+        print("Connection closed")
+        self.client_sock.close()
 
     def send_message(self):
         while True:
-            try:
-                ready = select.select([sys.stdin], [], [], 0.5)
-                if ready[0]:
-                    message = sys.stdin.readline()
-                    self.client_sock.send(message.encode("utf-8"))
-            except:
+            message = input("Enter message to send (or 'q' to quit): ")
+            if message == 'q':
                 break
+            self.client_sock.send(message.encode("utf-8"))
+
+        print("Connection closed")
+        self.client_sock.close()
 
     def close(self):
-        self.client_sock.close()
-        self.server_sock.close()
+        if self.client_sock:
+            self.client_sock.close()
+        if self.server_sock:
+            self.server_sock.close()
 
 if __name__ == "__main__":
     chat = BluetoothChat()
