@@ -7,13 +7,13 @@ This program allows two Raspberry Pis to communicate with each other over Blueto
 3. PyBluez library installed on both Raspberry Pis. You can install it by running `pip3 install pybluez`.
 
 ## Usage
-1. Save the bluetooth_chat.py program on both Raspberry Pis.
+1. Save the chat.py program on both Raspberry Pis.
 
-2. Run the program on the first Raspberry Pi by typing `python3 bluetooth_chat.py` in the terminal.
+2. Run the program on the first Raspberry Pi by typing `python3 chat.py` in the terminal.
 
 3. When prompted, enter `1` to start the program in server mode. The program will start listening for a connection from the second Raspberry Pi.
 
-4. Run the program on the second Raspberry Pi by typing `python3 bluetooth_chat.py` in the terminal.
+4. Run the program on the second Raspberry Pi by typing `python3 chat.py` in the terminal.
 
 5. When prompted, enter `2` to start the program in client mode. The program will prompt you for the MAC address of the first Raspberry Pi. Enter the MAC address and the two Pis will connect.
 
