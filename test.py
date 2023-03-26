@@ -1,84 +1,67 @@
-import tkinter as tk
-from tkinter import scrolledtext
 import bluetooth
+import sys
+from termcolor import colored
 
-class ChatGUI:
-    def __init__(self, master):
-        self.master = master
-        master.title("Bluetooth Chat")
-        master.configure(background='#1E90FF')
-        master.resizable(False, False)
+def print_blue(msg):
+    print(colored(msg, "blue"))
 
-        self.frame = tk.Frame(master, background='#B0E0E6')
-        self.frame.pack(padx=10, pady=10)
+def print_light_blue(msg):
+    print(colored(msg, "powderblue"))
 
-        self.chat_log = scrolledtext.ScrolledText(self.frame, width=40, height=10)
-        self.chat_log.configure(state='disabled')
-        self.chat_log.grid(row=0, column=0, padx=5, pady=5)
-
-        self.entry_field = tk.Entry(self.frame, width=30)
-        self.entry_field.grid(row=1, column=0, padx=5, pady=5)
-
-        self.send_button = tk.Button(self.frame, text="Send", command=self.send_message)
-        self.send_button.grid(row=1, column=1, padx=5, pady=5)
-
-        self.quit_button = tk.Button(self.frame, text="Quit", command=self.master.quit)
-        self.quit_button.grid(row=1, column=2, padx=5, pady=5)
-
-    def send_message(self):
-        message = self.entry_field.get()
-        if message:
-            self.entry_field.delete(0, tk.END)
-            self.chat_log.configure(state='normal')
-            self.chat_log.insert(tk.END, f"You: {message}\n")
-            self.chat_log.see(tk.END)
-            self.chat_log.configure(state='disabled')
-            send_message_to_server(message)
-
-    def display_message(self, message):
-        self.chat_log.configure(state='normal')
-        self.chat_log.insert(tk.END, f"Server: {message}\n")
-        self.chat_log.see(tk.END)
-        self.chat_log.configure(state='disabled')
-        
-server_address = None
-client_socket = None
-
-def connect_to_server():
-    global server_address, client_socket
-    nearby_devices = bluetooth.discover_devices()
-    for device in nearby_devices:
-        if 'Raspberry Pi' in bluetooth.lookup_name(device):
-            server_address = device
-            break
-
-    if server_address is None:
-        print("No nearby Raspberry Pi devices found.")
-        return False
-
+def run_server():
+    print_blue("[INFO] Server started...")
+    server_sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
     port = 1
-    client_socket = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
-    client_socket.connect((server_address, port))
-    return True
-
-def close_connection():
-    if client_socket:
-        client_socket.close()
-
-def send_message_to_server(message):
-    if client_socket:
-        client_socket.send(message.encode())
-
-def receive_messages_from_server(chat_gui):
+    server_sock.bind(("", port))
+    server_sock.listen(1)
+    client_sock, client_info = server_sock.accept()
+    print_blue("[INFO] Accepted connection from ", end="")
+    print_light_blue(client_info)
     while True:
-        if client_socket:
-            message = client_socket.recv(1024)
-            if message:
-                chat_gui.display_message(message.decode())
-                
-if __name__ == '__main__':
-    root = tk.Tk()
-    chat_gui = ChatGUI(root)
-    connected = connect_to_server()
-    if connected:
-        receive_thread = threading.Thread(target=receive_messages_from_server, args=(chat_gui,))
+        try:
+            data = client_sock.recv(1024).decode().strip()
+            if not data:
+                continue
+            print_blue("[RECEIVED] ", end="")
+            print_light_blue(data)
+            msg = input(">> ")
+            if not msg:
+                continue
+            client_sock.send(msg.encode())
+        except KeyboardInterrupt:
+            break
+    client_sock.close()
+    server_sock.close()
+    print_blue("[INFO] Server stopped.")
+
+def run_client():
+    print_blue("[INFO] Client started...")
+    server_addr = input("Enter the server Bluetooth MAC address: ")
+    port = 1
+    client_sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
+    client_sock.connect((server_addr, port))
+    while True:
+        try:
+            msg = input(">> ")
+            if not msg:
+                continue
+            client_sock.send(msg.encode())
+            data = client_sock.recv(1024).decode().strip()
+            if not data:
+                continue
+            print_blue("[RECEIVED] ", end="")
+            print_light_blue(data)
+        except KeyboardInterrupt:
+            break
+    client_sock.close()
+    print_blue("[INFO] Client stopped.")
+
+if __name__ == "__main__":
+    print_blue("==== Bluetooth Chat ====")
+    option = input("Enter 1 for server, 2 for client: ")
+    if option == "1":
+        run_server()
+    elif option == "2":
+        run_client()
+    else:
+        print_blue("Invalid option. Please try again.")
