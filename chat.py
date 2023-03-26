@@ -1,5 +1,6 @@
 import bluetooth
-import threading
+import sys
+import select
 
 class BluetoothChat:
     def __init__(self):
@@ -19,12 +20,6 @@ class BluetoothChat:
         self.client_sock, self.client_info = self.server_sock.accept()
         print("Accepted connection from", self.client_info)
 
-        receive_thread = threading.Thread(target=self.receive_message)
-        receive_thread.start()
-
-        send_thread = threading.Thread(target=self.send_message)
-        send_thread.start()
-
     def start_client(self, server_mac_address):
         port = 1
 
@@ -34,27 +29,26 @@ class BluetoothChat:
 
         self.client_sock.connect((server_mac_address, port))
 
-        receive_thread = threading.Thread(target=self.receive_message)
-        receive_thread.start()
-
-        send_thread = threading.Thread(target=self.send_message)
-        send_thread.start()
-
     def receive_message(self):
         while True:
             try:
-                data = self.client_sock.recv(1024)
-                if not data:
-                    break
-                print("Received message:", data.decode("utf-8"))
+                ready = select.select([self.client_sock], [], [], 0.5)
+                if ready[0]:
+                    data = self.client_sock.recv(1024)
+                    if not data:
+                        break
+                    print("Received message:", data.decode("utf-8"))
+                    sys.stdout.flush()  # force printing to console
             except:
                 break
 
     def send_message(self):
         while True:
-            message = input("Send a message: ")
             try:
-                self.client_sock.send(message.encode("utf-8"))
+                ready = select.select([sys.stdin], [], [], 0.5)
+                if ready[0]:
+                    message = sys.stdin.readline()
+                    self.client_sock.send(message.encode("utf-8"))
             except:
                 break
 
@@ -74,6 +68,13 @@ if __name__ == "__main__":
     else:
         print("Invalid option")
 
-    input("Press enter to close the program")
+    receive_thread = threading.Thread(target=chat.receive_message)
+    receive_thread.start()
+
+    send_thread = threading.Thread(target=chat.send_message)
+    send_thread.start()
+
+    receive_thread.join()
+    send_thread.join()
 
     chat.close()
