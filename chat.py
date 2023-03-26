@@ -1,58 +1,79 @@
 import bluetooth
+import threading
 
-def start_server():
-    # Set up the Bluetooth socket
-    server_socket = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
-    port = 1  # This can be any free port
-    server_socket.bind(("", port))
-    server_socket.listen(1)  # Listen for one incoming connection
+class BluetoothChat:
+    def __init__(self):
+        self.server_sock = None
+        self.client_sock = None
+        self.client_info = None
 
-    # Wait for a client to connect
-    print("Waiting for connection...")
-    client_socket, address = server_socket.accept()
-    print("Accepted connection from", address)
+    def start_server(self):
+        self.server_sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
+        self.server_sock.bind(("", bluetooth.PORT_ANY))
+        self.server_sock.listen(1)
 
-    # Start the message loop
-    while True:
-        # Wait for input from the user
-        message = input("Type your message: ")
+        port = self.server_sock.getsockname()[1]
 
-        # Send the message to the client
-        client_socket.send(message.encode())
+        print("Waiting for connection on RFCOMM channel", port)
 
-        # Receive the client's response
-        data = client_socket.recv(1024)
-        print("Received:", data.decode())
+        self.client_sock, self.client_info = self.server_sock.accept()
+        print("Accepted connection from", self.client_info)
 
-def start_client():
-    # Set up the Bluetooth socket
-    client_socket = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
+        receive_thread = threading.Thread(target=self.receive_message)
+        receive_thread.start()
 
-    # Get the server's MAC address
-    server_address = input("Enter the server's MAC address: ")
-    port = 1  # This should match the port used by the server
-    client_socket.connect((server_address, port))
+        send_thread = threading.Thread(target=self.send_message)
+        send_thread.start()
 
-    # Start the message loop
-    while True:
-        # Wait for input from the user
-        message = input("Type your message: ")
+    def start_client(self, server_mac_address):
+        port = 1
 
-        # Send the message to the server
-        client_socket.send(message.encode())
+        self.client_sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
 
-        # Receive the server's response
-        data = client_socket.recv(1024)
-        print("Received:", data.decode())
+        print("Connecting to", server_mac_address)
 
-# Ask the user which mode to start in
-while True:
-    mode = input("Enter 1 for server or 2 for client: ")
+        self.client_sock.connect((server_mac_address, port))
+
+        receive_thread = threading.Thread(target=self.receive_message)
+        receive_thread.start()
+
+        send_thread = threading.Thread(target=self.send_message)
+        send_thread.start()
+
+    def receive_message(self):
+        while True:
+            try:
+                data = self.client_sock.recv(1024)
+                if not data:
+                    break
+                print("Received message:", data.decode("utf-8"))
+            except:
+                break
+
+    def send_message(self):
+        while True:
+            message = input("Send a message: ")
+            try:
+                self.client_sock.send(message.encode("utf-8"))
+            except:
+                break
+
+    def close(self):
+        self.client_sock.close()
+        self.server_sock.close()
+
+if __name__ == "__main__":
+    chat = BluetoothChat()
+
+    mode = input("Enter 1 to start as server, or 2 to start as client: ")
     if mode == "1":
-        start_server()
-        break
+        chat.start_server()
     elif mode == "2":
-        start_client()
-        break
+        server_mac_address = input("Enter server MAC address: ")
+        chat.start_client(server_mac_address)
     else:
-        print("Invalid option. Please enter 1 for server or 2 for client.")
+        print("Invalid option")
+
+    input("Press enter to close the program")
+
+    chat.close()
