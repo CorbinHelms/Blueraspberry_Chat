@@ -43,10 +43,11 @@ class ChatGUI:
         self.chat = BluetoothChat()
         self.chat.start_server()
         
-    def connect_client(self):
-        if self.chat is not None:
-            messagebox.showwarning("Warning", "Already connected to a device.")
-            return
+   def connect_client(self):
+    server_address = tk.simpledialog.askstring("Input", "Enter server MAC address:")
+    messagebox.showinfo("Information", "Connecting to " + server_address)
+    self.chat = BluetoothChat(server_address)
+    self.chat.connect_client()
 
         server_address = tk.simpledialog.askstring("Input", "Enter server MAC address:")
         if server_address is not None:
