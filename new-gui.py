@@ -2,55 +2,65 @@ import tkinter as tk
 from tkinter import messagebox, simpledialog
 from chat import BluetoothChat
 
-class ChatGUI(tk.Tk):
+class ChatGUI:
     def __init__(self):
-        super().__init__()
+        self.window = tk.Tk()
+        self.window.geometry("600x500")
+        self.window.title("Bluetooth Chat")
 
-        # Set window properties
-        self.title("Bluetooth Chat")
-        self.geometry("600x500")
-        self.resizable(False, False)
-
-        # Create widgets
-        self.server_button = tk.Button(self, text="Start As Server", command=self.start_as_server, bg="#b6d0e2", width=111, height=32)
+        self.server_button = tk.Button(self.window, text="Start As Server", bg="#b6d0e2", width=11, height=2, command=self.start_as_server)
         self.server_button.place(x=10, y=20)
 
-        self.client_button = tk.Button(self, text="Start As Client", command=self.connect_client, bg="#b6d0e2", width=111, height=32)
+        self.client_button = tk.Button(self.window, text="Start As Client", bg="#b6d0e2", width=11, height=2, command=self.connect_client)
         self.client_button.place(x=140, y=20)
 
-        self.incoming_text = tk.Text(self, width=57, height=26)
-        self.incoming_text.place(x=10, y=90)
+        self.incoming_message_box = tk.Text(self.window, bg="white", state="disabled", width=57, height=13)
+        self.incoming_message_box.place(x=10, y=90)
 
-        self.outgoing_entry = tk.Entry(self, width=46)
-        self.outgoing_entry.place(x=10, y=380)
+        self.outgoing_message_bar = tk.Entry(self.window, width=46)
+        self.outgoing_message_bar.place(x=10, y=380)
 
-        self.send_button = tk.Button(self, text="Send", command=self.send_message, bg="#b6d0e2", width=111, height=32)
+        self.send_button = tk.Button(self.window, text="Send", bg="#b6d0e2", width=11, height=2, command=self.send_message)
         self.send_button.place(x=480, y=380)
 
-        self.disconnect_button = tk.Button(self, text="Disconnect", command=self.disconnect, bg="#d84563", width=111, height=32)
+        self.disconnect_button = tk.Button(self.window, text="Disconnect", bg="#d84563", width=11, height=2, command=self.disconnect)
         self.disconnect_button.place(x=480, y=440)
+
+        self.chat = None
+
+        self.window.mainloop()
 
     def start_as_server(self):
         self.chat = BluetoothChat()
-        self.chat.start_server()
-        messagebox.showinfo("Information", "Server started")
+        self.chat.start_as_server()
+        messagebox.showinfo("Information", "Server started. Waiting for connection...")
 
     def connect_client(self):
-        server_address = tk.simpledialog.askstring("Input", "Enter server MAC address:")
+        server_address = simpledialog.askstring("Input", "Enter server MAC address:")
+        self.chat = BluetoothChat(server_address)
+        self.chat.connect_client()
         messagebox.showinfo("Information", "Connecting to " + server_address)
-        self.chat = BluetoothChat()
-        self.chat.connect_client(server_address)
 
     def send_message(self):
-        message = self.outgoing_entry.get()
-        self.chat.send(message)
-        self.incoming_text.insert(tk.END, "Me: " + message + "\n")
-        self.outgoing_entry.delete(0, tk.END)
+        if self.chat:
+            message = self.outgoing_message_bar.get()
+            self.incoming_message_box.configure(state="normal")
+            self.incoming_message_box.insert("end", "You: " + message + "\n")
+            self.incoming_message_box.configure(state="disabled")
+            self.outgoing_message_bar.delete(0, "end")
+            self.chat.send_message(message)
+
+    def display_received_message(self, message):
+        self.incoming_message_box.configure(state="normal")
+        self.incoming_message_box.insert("end", "Other: " + message + "\n")
+        self.incoming_message_box.configure(state="disabled")
 
     def disconnect(self):
-        self.chat.disconnect()
-        messagebox.showinfo("Information", "Disconnected")
+        if self.chat:
+            self.chat.disconnect()
+            messagebox.showinfo("Information", "Disconnected from Bluetooth device.")
+        else:
+            messagebox.showinfo("Information", "Not currently connected to a Bluetooth device.")
 
 if __name__ == "__main__":
-    gui = ChatGUI()
-    gui.mainloop()
+    ChatGUI()
