@@ -1,62 +1,51 @@
 import bluetooth
-import threading
 import sys
 
 class BluetoothChat:
-    def __init__(self, server_address=None):
-        self.server_address = server_address
-        self.client_socket = None
+    def __init__(self):
         self.server_socket = None
-        self.running = False
+        self.client_socket = None
+        self.socket = None
 
-    def start_as_server(self):
-        self.running = True
+    def start_server(self):
         self.server_socket = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
         self.server_socket.bind(("", bluetooth.PORT_ANY))
         self.server_socket.listen(1)
 
         port = self.server_socket.getsockname()[1]
+        uuid = "00001101-0000-1000-8000-00805F9B34FB"
 
-        bluetooth.advertise_service(
-            self.server_socket,
-            "BluetoothChat",
-            service_id="",
-            service_classes=[bluetooth.SERIAL_PORT_CLASS],
-            profiles=[bluetooth.SERIAL_PORT_PROFILE],
-            #protocols=[bluetooth.OBEX_UUID]
-        )
+        bluetooth.advertise_service(self.server_socket, "BluetoothChat",
+                                    service_id=uuid,
+                                    service_classes=[uuid, bluetooth.SERIAL_PORT_CLASS],
+                                    profiles=[bluetooth.SERIAL_PORT_PROFILE],
+                                    )
+        self.client_socket, client_info = self.server_socket.accept()
+        print("Accepted connection from", client_info)
 
-        print("Waiting for connection on RFCOMM channel", port)
-        self.client_socket, client_address = self.server_socket.accept()
-        print("Accepted connection from", client_address)
+        self.socket = self.client_socket
 
-    def start_as_client(self, server_address):
+    def connect_client(self, server_address):
+        port = 1
+        uuid = "00001101-0000-1000-8000-00805F9B34FB"
+
         self.client_socket = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
-        self.client_socket.connect((server_address, bluetooth.PORT_ANY))
+        self.client_socket.connect((server_address, port))
 
-    def receive_messages(self, receive_callback):
-        while self.running:
-            try:
-                data = self.client_socket.recv(1024)
-                if data:
-                    receive_callback(data.decode('utf-8'))
-                else:
-                    print('No more data from', self.client_socket)
-                    break
-            except ConnectionResetError:
-                print('Disconnected')
-                break
+        self.socket = self.client_socket
+        print("Connected to", server_address)
 
     def send_message(self, message):
-        try:
-            self.client_socket.send(message.encode('utf-8'))
-        except AttributeError:
-            print('Not connected yet')
+        self.socket.send(message.encode())
+
+    def receive_message(self):
+        message = self.socket.recv(1024)
+        return message.decode()
 
     def disconnect(self):
-        self.running = False
+        if self.socket:
+            self.socket.close()
         if self.server_socket:
             self.server_socket.close()
         if self.client_socket:
             self.client_socket.close()
-        print('Disconnected')
