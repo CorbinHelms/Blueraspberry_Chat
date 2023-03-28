@@ -3,77 +3,92 @@ import sys
 import threading
 
 class BluetoothChat:
-    def __init__(self):
-        self.server_sock = None
-        self.client_sock = None
-        self.client_info = None
-
+    def __init__(self, server_address=None):
+        self.server_address = server_address
+        self.client_socket = None
+        self.server_socket = None
+        self.running = False
+        
     def start_server(self):
-        self.server_sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
-        self.server_sock.bind(("", bluetooth.PORT_ANY))
-        self.server_sock.listen(1)
+        self.server_socket = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
+        self.server_socket.bind(("", bluetooth.PORT_ANY))
+        self.server_socket.listen(1)
 
-        port = self.server_sock.getsockname()[1]
+        port = self.server_socket.getsockname()[1]
+
+        uuid = "94f39d29-7d6d-437d-973b-fba39e49d4ee"
+
+        bluetooth.advertise_service(self.server_socket, "BluetoothChat",
+                                    service_id=uuid,
+                                    service_classes=[uuid, bluetooth.SERIAL_PORT_CLASS],
+                                    profiles=[bluetooth.SERIAL_PORT_PROFILE])
 
         print("Waiting for connection on RFCOMM channel", port)
 
-        self.client_sock, self.client_info = self.server_sock.accept()
-        print("Accepted connection from", self.client_info)
+        self.client_socket, client_address = self.server_socket.accept()
+        print("Accepted connection from", client_address)
 
-    def start_client(self, server_mac_address):
-        port = 1
-
-        self.client_sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
-
-        print("Connecting to", server_mac_address)
-
-        self.client_sock.connect((server_mac_address, port))
-
-    def receive_message(self):
-        while True:
-            data = self.client_sock.recv(1024)
-            if not data:
+        self.running = True
+        
+        while self.running:
+            try:
+                data = self.client_socket.recv(1024)
+                if not data:
+                    break
+                print("Received", data.decode())
+            except OSError:
                 break
-            print("Received message:", data.decode("utf-8"))
 
-        print("Connection closed")
-        self.client_sock.close()
+    def connect_client(self, server_address):
+        self.client_socket = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
+        self.client_socket.connect((server_address, bluetooth.PORT_ANY))
 
-    def send_message(self):
-        while True:
-            message = input("Enter message to send (or 'q' to quit): ")
-            if message == 'q':
+        print("Connected to", server_address)
+
+        self.running = True
+        
+        while self.running:
+            try:
+                data = self.client_socket.recv(1024)
+                if not data:
+                    break
+                print("Received", data.decode())
+            except OSError:
                 break
-            self.client_sock.send(message.encode("utf-8"))
 
-        print("Connection closed")
-        self.client_sock.close()
+    def send_message(self, message):
+        if self.client_socket:
+            self.client_socket.send(message.encode())
+        elif self.server_socket:
+            self.client_socket.send(message.encode())
 
-    def close(self):
-        if self.client_sock:
-            self.client_sock.close()
-        if self.server_sock:
-            self.server_sock.close()
+    def disconnect(self):
+        self.running = False
+        if self.client_socket:
+            self.client_socket.close()
+        elif self.server_socket:
+            self.server_socket.close()
 
-if __name__ == "__main__":
+class BluetoothChatThread(threading.Thread):
+    def __init__(self, chat):
+        threading.Thread.__init__(self)
+        self.chat = chat
+        
+    def run(self):
+        if self.chat.server_address:
+            self.chat.start_server()
+        else:
+            self.chat.connect_client()
+
+if __name__ == '__main__':
     chat = BluetoothChat()
+    chat_thread = BluetoothChatThread(chat)
+    chat_thread.start()
 
-    mode = input("Enter 1 to start as server, or 2 to start as client: ")
-    if mode == "1":
-        chat.start_server()
-    elif mode == "2":
-        server_mac_address = input("Enter server MAC address: ")
-        chat.start_client(server_mac_address)
-    else:
-        print("Invalid option")
+    while True:
+        message = input("Enter message: ")
+        chat.send_message(message)
 
-    receive_thread = threading.Thread(target=chat.receive_message)
-    receive_thread.start()
-
-    send_thread = threading.Thread(target=chat.send_message)
-    send_thread.start()
-
-    receive_thread.join()
-    send_thread.join()
-
-    chat.close()
+        if message == 'quit':
+            chat.disconnect()
+            sys.exit(0)
