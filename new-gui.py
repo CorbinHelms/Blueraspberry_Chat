@@ -2,61 +2,64 @@ import tkinter as tk
 from tkinter import messagebox, simpledialog
 from chat import BluetoothChat
 
-class ChatGUI:
-    def __init__(self, master):
+class ChatGUI(tk.Frame):
+    def __init__(self, master=None):
+        super().__init__(master)
         self.master = master
-        master.title("Bluetooth Chat")
-        master.geometry("600x500")
-
-        self.incoming_frame = tk.Frame(master, bg="#b6d0e2")
-        self.incoming_frame.place(x=10, y=90, width=572, height=261)
-
-        self.incoming_message = tk.Text(self.incoming_frame, bg="#ffffff")
-        self.incoming_message.place(relwidth=1, relheight=1)
-
-        self.outgoing_frame = tk.Frame(master, bg="#b6d0e2")
-        self.outgoing_frame.place(x=10, y=380, width=461, height=32)
-
-        self.outgoing_message = tk.Entry(self.outgoing_frame, bg="#ffffff")
-        self.outgoing_message.place(relwidth=0.8, relheight=1)
-
-        self.send_button = tk.Button(self.outgoing_frame, text="Send", bg="#b6d0e2", command=self.send_message)
-        self.send_button.place(relx=0.8, relheight=1, relwidth=0.2)
-
-        self.disconnect_button = tk.Button(master, text="Disconnect", bg="#d84563", command=self.disconnect)
-        self.disconnect_button.place(x=480, y=440, width=111, height=32)
-
-        self.start_as_server_button = tk.Button(master, text="Start As Server", bg="#b6d0e2", command=self.start_as_server)
-        self.start_as_server_button.place(x=10, y=20, width=111, height=32)
-
-        self.start_as_client_button = tk.Button(master, text="Start As Client", bg="#b6d0e2", command=self.connect_client)
-        self.start_as_client_button.place(x=140, y=20, width=111, height=32)
+        self.master.title("Bluetooth Chat")
+        self.master.geometry("600x500")
+        self.create_widgets()
+        self.chat = None
+        
+    def create_widgets(self):
+        self.incoming_message_box = tk.Text(self.master, width=65, height=15, state="disabled")
+        self.incoming_message_box.place(x=10, y=90)
+        
+        self.outgoing_message_bar = tk.Entry(self.master, width=55)
+        self.outgoing_message_bar.place(x=10, y=380)
+        
+        self.start_as_server_button = tk.Button(self.master, text="Start As Server", width=20, height=2, bg="#b6d0e2", command=self.start_as_server)
+        self.start_as_server_button.place(x=10, y=20)
+        
+        self.start_as_client_button = tk.Button(self.master, text="Start As Client", width=20, height=2, bg="#b6d0e2", command=self.connect_client)
+        self.start_as_client_button.place(x=140, y=20)
+        
+        self.send_button = tk.Button(self.master, text="Send", width=20, height=2, bg="#b6d0e2", command=self.send_message)
+        self.send_button.place(x=480, y=380)
+        
+        self.disconnect_button = tk.Button(self.master, text="Disconnect", width=20, height=2, bg="#d84563", command=self.disconnect)
+        self.disconnect_button.place(x=480, y=440)
 
     def start_as_server(self):
-        self.chat = BluetoothChat('server')
+        self.chat = BluetoothChat()
         self.chat.start_server()
-        messagebox.showinfo("Information", "Started as server")
-
+        self.incoming_message_box.config(state="normal")
+        self.incoming_message_box.insert("end", "Server started...\n")
+        self.incoming_message_box.config(state="disabled")
+        
     def connect_client(self):
-        server_address = tk.simpledialog.askstring("Input", "Enter server MAC address:")
-        messagebox.showinfo("Information", "Connecting to " + server_address)
-        self.chat = BluetoothChat('client')
+        server_address = simpledialog.askstring("Input", "Enter server MAC address:")
+        self.chat = BluetoothChat()
         self.chat.connect_client(server_address)
-
+        self.incoming_message_box.config(state="normal")
+        self.incoming_message_box.insert("end", "Connected to server " + server_address + "\n")
+        self.incoming_message_box.config(state="disabled")
+        
     def send_message(self):
-        message = self.outgoing_message.get()
+        message = self.outgoing_message_bar.get()
+        self.outgoing_message_bar.delete(0, "end")
         self.chat.send_message(message)
-        self.outgoing_message.delete(0, 'end')
-
-    def receive_message(self, message):
-        self.incoming_message.insert('end', message + "\n")
-
+        self.incoming_message_box.config(state="normal")
+        self.incoming_message_box.insert("end", "You: " + message + "\n")
+        self.incoming_message_box.config(state="disabled")
+        
     def disconnect(self):
         self.chat.disconnect()
-        messagebox.showinfo("Information", "Disconnected")
-
+        self.incoming_message_box.config(state="normal")
+        self.incoming_message_box.insert("end", "Disconnected from server\n")
+        self.incoming_message_box.config(state="disabled")
 
 if __name__ == "__main__":
     root = tk.Tk()
-    chat_gui = ChatGUI(root)
-    root.mainloop()
+    app = ChatGUI(master=root)
+    app.mainloop()
