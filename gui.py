@@ -34,32 +34,50 @@ class BluetoothChatGUI:
         self.thread = None
 
     def start_as_server(self):
-        self.chat = BluetoothChat()
-        self.thread = threading.Thread(target=self.chat.start_server)
-        self.thread.start()
+           self.chat = BluetoothChat()
+           self.chat.start_server()
+           self.thread = threading.Thread(target=self.receive_message)
+           self.thread.start()
 
     def start_as_client(self):
-        server_mac_address = simpledialog.askstring(title="Server MAC Address", prompt="Enter server MAC address:")
-        if server_mac_address:
+        server_mac_address = simpledialog.askstring("Server MAC Address", "Enter the server's MAC address:")
+        if server_mac_address is not None:
             self.chat = BluetoothChat()
-            self.thread = threading.Thread(target=self.chat.start_client, args=(server_mac_address,))
+            self.chat.start_client(server_mac_address)
+            self.thread = threading.Thread(target=self.receive_message)
             self.thread.start()
 
+    def receive_message(self):
+        while True:
+            data = self.chat.receive()
+            if data:
+                self.incoming_message.configure(state="normal")
+                self.incoming_message.insert(tk.END, ">> " + data + "\n")
+                self.incoming_message.configure(state="disabled")
+            else:
+                messagebox.showerror("Error", "Lost connection to server")
+                self.disconnect()
+
     def send_message(self):
-        if self.chat and self.chat.client_sock:
-            message = self.outgoing_message.get()
-            if message:
-                self.chat.client_sock.send(message.encode("utf-8"))
-                self.outgoing_message.delete(0, tk.END)
+        message = self.outgoing_message.get()
+        if self.chat.send(message):
+            self.incoming_message.configure(state="normal")
+            self.incoming_message.insert(tk.END, "<< " + message + "\n")
+            self.incoming_message.configure(state="disabled")
+            self.outgoing_message.delete(0, tk.END)
 
     def disconnect(self):
-        if self.chat:
-            self.chat.close()
+        self.chat.close()
+        self.chat = None
+        self.thread = None
+        self.incoming_message.configure(state="normal")
+        self.incoming_message.delete("1.0", tk.END)
+        self.incoming_message.configure(state="disabled")
 
     def run(self):
         self.root.mainloop()
 
 
 if __name__ == "__main__":
-    app = BluetoothChatGUI()
-    app.run()
+    gui = BluetoothChatGUI()
+    gui.run()
