@@ -3,10 +3,12 @@ import sys
 import threading
 
 class BluetoothChat:
-    def __init__(self):
-        self.server_sock = None
-        self.client_sock = None
-        self.client_info = None
+    def __init__(self, server_address):
+        self.server_address = server_address
+        self.client_socket = None
+        self.server_socket = None
+        self.connected = False
+        self.receive_thread = None
 
     def start_server(self):
         self.server_sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
