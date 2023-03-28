@@ -47,13 +47,19 @@ class BluetoothChatGUI:
         self.receive_thread.start()
 
     def receive_message(self):
-        while True:
-            data = self.chat.client_sock.recv(1024)
-            if not data:
-                break
-            self.incoming_text.insert(tk.END, data.decode("utf-8"))
+    while True:
+        data = self.chat.client_sock.recv(1024)
+        if not data:
+            break
+        self.receive_text.config(state="normal")
+        self.receive_text.insert(tk.END, data.decode("utf-8"))
+        self.receive_text.see(tk.END)
+        self.receive_text.config(state="disabled")
 
-        self.incoming_text.insert(tk.END, "Connection closed")
+    self.receive_text.config(state="normal")
+    self.receive_text.insert(tk.END, "Connection closed\n")
+    self.receive_text.config(state="disabled")
+
 
     def send_message(self):
         message = self.outgoing_entry.get()
