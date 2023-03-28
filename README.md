@@ -22,7 +22,7 @@ This program allows two Raspberry Pis to communicate with each other over Blueto
 
 7. To stop the program, use `Ctrl+C` to interrupt the message loop and close the Bluetooth socket.
 
-##Usage 
+## Usage 
 ### In the GUI
 
 1. Save the chat.py and the gui.py on both Raspberry Pis.
