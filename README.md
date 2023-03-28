@@ -7,7 +7,7 @@ This program allows two Raspberry Pis to communicate with each other over Blueto
 3. PyBluez library installed on both Raspberry Pis. You can install it by running `pip3 install pybluez`.
 
 ## Usage
-### In Command Line
+### Command Line
 1. Save the chat.py program on both Raspberry Pis.
 
 2. Run the program on the first Raspberry Pi by typing `python3 chat.py` in the terminal.
@@ -23,7 +23,7 @@ This program allows two Raspberry Pis to communicate with each other over Blueto
 7. To stop the program, use `Ctrl+C` to interrupt the message loop and close the Bluetooth socket.
 
 ## Usage 
-### In the GUI
+### GUI
 
 1. Save the chat.py and the gui.py on both Raspberry Pis.
 
