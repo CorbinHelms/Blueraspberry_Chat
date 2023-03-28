@@ -49,7 +49,7 @@ class BluetoothChatGUI:
 
     def receive_message(self):
         while True:
-            data = self.chat.receive()
+            data = receive_message(self):
             if data:
                 self.incoming_message.configure(state="normal")
                 self.incoming_message.insert(tk.END, ">> " + data + "\n")
